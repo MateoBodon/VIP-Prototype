@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
 namespace VIP
@@ -8,23 +9,29 @@ namespace VIP
     public class ThirdPersonMovement : MonoBehaviour
     {
         #region Variables
-        //Controls the speed of the player * Can be changed to simulate walking and sprinting
-        [SerializeField] float speed = 6f;
+        //Controls the speed of the player and rate of acceleration     
+        [SerializeField] float walkSpeed = 6f;
+        [SerializeField] float sprintSpeed = 12f;
+        [SerializeField] float speedUpRate = 5f;
+        [SerializeField] float slowDownRate = 8f;
+       
         //controls the speed of the descent
         [SerializeField] float gravity = -9.81f;
         //Jump height
         [SerializeField] float jumpHeight = 3f;
 
         //Used to check if grounded. Ground check on player/groundMask on enviroment/ground distance is radius
-        [SerializeField] Transform groundCheck;
+        [SerializeField] Transform groundCheck = null;
         [SerializeField] float groundDistance = 0.4f;
         [SerializeField] LayerMask groundMask;
 
         Transform mainCamera;
         CharacterController characterController;
 
+        float speed = 6f;
         Vector3 velocity;
         bool isGrounded;
+        bool isMoving;
         #endregion
 
         #region BuiltInMethods
@@ -40,46 +47,14 @@ namespace VIP
             CursorStatus();
         }
 
-        //(COULD BE MORE OPTIMIZED BUT JUST A SIMPLE SOLUTION FOR NOW)
         private void Update()
         {
-
             FallAndJump();
-
-            
-            //Input axis
-            float horizontal = Input.GetAxisRaw("Horizontal");
-            float vertical = Input.GetAxisRaw("Vertical");
-
-            //Tells the direction of the key strokes -Horizontal/Right and Left/X axis - Vertical/Up and down/Z axis  * Y left zero so player doesnt float up
-            //*Nomalized so diagonal movements are not faster
-            Vector3 direction = new Vector3(horizontal, 0f, vertical).normalized;
-
-            
-
-            //Tells if the player is moving
-            if (direction.magnitude >= .1f)
-            {
-                //makes movement dependant on main camera and not world space
-                float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + mainCamera.eulerAngles.y;
-
-                // sets the rotation of the player to the forward axis of the main camera
-                transform.rotation = Quaternion.Euler(0f, mainCamera.eulerAngles.y, 0f);
-
-                // tells the direction the player needs to go
-                Vector3 moveDir = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
-
-                //moves the character based on the moveDir, speed and multiplied by time.delta time to be framerate independent
-                characterController.Move(moveDir.normalized * speed * Time.deltaTime);
-            }
-            //Tells if the player is idle
-            else if (direction.magnitude == 0)
-            {
-                //Will rotate the players forward axis to the cameras forward axis to keep the player rotation with the main camera
-                transform.rotation = Quaternion.Euler(0f, mainCamera.eulerAngles.y, 0f);
-            }
+            Movement();
 
         }
+
+        
         #endregion
 
         #region CustomMethods
@@ -115,6 +90,60 @@ namespace VIP
             //moves the character with by the velocity and frame rate independent *Multiplied by time.deltatime twice because time is squared
             characterController.Move(velocity * Time.deltaTime);
 
+        }
+
+        private void Movement()
+        {
+
+            //Input axis
+            float horizontal = Input.GetAxisRaw("Horizontal");
+            float vertical = Input.GetAxisRaw("Vertical");
+
+            //Tells the direction of the key strokes -Horizontal/Right and Left/X axis - Vertical/Up and down/Z axis  * Y left zero so player doesnt float up
+            //*Nomalized so diagonal movements are not faster
+            Vector3 direction = new Vector3(horizontal, 0f, vertical).normalized;
+
+            //Determines if the player should speed up or slow down
+            Sprint();
+
+            //Tells if the player is moving
+            if (direction.magnitude >= .1f) isMoving = true;
+            else isMoving = false;
+            
+            if (isMoving)
+            {              
+                //makes movement dependant on main camera and not world space
+                float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + mainCamera.eulerAngles.y;
+
+                // sets the rotation of the player to the forward axis of the main camera
+                transform.rotation = Quaternion.Euler(0f, mainCamera.eulerAngles.y, 0f);
+
+                // tells the direction the player needs to go
+                Vector3 moveDir = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
+
+                //moves the character based on the moveDir, speed and multiplied by time.delta time to be framerate independent
+                characterController.Move(moveDir.normalized * speed * Time.deltaTime);
+            }
+            //Tells if the player is idle
+            else if (direction.magnitude == 0)
+            {
+                //Will rotate the players forward axis to the cameras forward axis to keep the player rotation with the main camera
+                transform.rotation = Quaternion.Euler(0f, mainCamera.eulerAngles.y, 0f);
+            }
+        }
+
+         void Sprint()
+        {
+            //Speeds up the player to the sprintspeed by a fixed rate
+            if (Input.GetButton("Sprint") && isMoving)
+            {
+                speed = Mathf.MoveTowards(speed, sprintSpeed, speedUpRate * Time.deltaTime);
+            }
+            //slows down the player to the walkspeed by a fixed rate
+            else if (speed != walkSpeed)
+            {
+                speed = Mathf.MoveTowards(speed, walkSpeed, slowDownRate * Time.deltaTime);
+            }
         }
         #endregion
 
